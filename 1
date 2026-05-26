@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PaceCalc - 跑步配速计算与训练规划</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Segoe UI',sans-serif;background:#0a0f1a;color:#e2e8f0;min-height:100vh;}
+.app{max-width:900px;margin:0 auto;padding:20px;}
+.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+.header h1{font-size:22px;color:#38bdf8;}
+.tabs{display:flex;gap:5px;margin-bottom:20px;flex-wrap:wrap;}
+.tab{padding:9px 16px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;cursor:pointer;font-size:12px;transition:.2s;}
+.tab:hover,.tab.active{background:rgba(56,189,248,.12);border-color:#38bdf8;color:#38bdf8;}
+.view{display:none;}.view.active{display:block;}
+
+.card{padding:20px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:14px;margin-bottom:16px;}
+.card h3{font-size:13px;color:#38bdf8;margin-bottom:12px;}
+.inp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;}
+.inp-group{display:flex;flex-direction:column;gap:4px;}
+.inp-group label{font-size:11px;opacity:.5;}
+.inp-group input,.inp-group select{padding:10px 12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e2e8f0;font-size:14px;font-family:'Fira Code',monospace;}
+.inp-group input:focus{outline:none;border-color:#38bdf8;}
+.calc-btn{padding:12px 24px;background:linear-gradient(135deg,#38bdf8,#0284c7);border:none;border-radius:10px;color:#0f172a;font-weight:700;font-size:13px;cursor:pointer;transition:.2s;margin-top:10px;}
+.calc-btn:hover{box-shadow:0 4px 15px rgba(56,189,248,.3);transform:scale(1.01);}
+
+.result-banner{padding:20px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:12px;text-align:center;margin:16px 0;}
+.result-banner .rb-val{font-size:36px;font-weight:bold;color:#38bdf8;font-family:'Fira Code',monospace;}
+.result-banner .rb-label{font-size:11px;opacity:.4;margin-top:4px;}
+.result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:12px;}
+.rg-item{padding:12px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;text-align:center;}
+.rg-item .rv{font-size:18px;font-weight:bold;color:#38bdf8;font-family:'Fira Code',monospace;}
+.rg-item .rl{font-size:10px;opacity:.4;margin-top:2px;}
+
+/* 分段表 */
+.split-table{width:100%;border-collapse:collapse;margin-top:10px;font-size:12px;}
+.split-table th{padding:8px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);color:#38bdf8;font-size:11px;}
+.split-table td{padding:8px;border-bottom:1px solid rgba(255,255,255,.04);font-family:'Fira Code',monospace;}
+.split-table tr:hover{background:rgba(56,189,248,.03);}
+
+/* 训练配速区间 */
+.zone-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:8px 0;}
+.zone-bar div{height:100%;}
+.zone-list{margin-top:8px;}
+.zone-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);font-size:12px;}
+.zone-dot{width:12px;height:12px;border-radius:3px;}
+.zone-name{min-width:80px;font-weight:600;}
+.zone-pace{font-family:'Fira Code',monospace;color:#38bdf8;min-width:100px;}
+.zone-hr{opacity:.5;}
+
+/* 比赛预测 */
+.race-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;}
+.race-card{padding:16px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px;text-align:center;transition:.2s;}
+.race-card:hover{border-color:rgba(56,189,248,.3);}
+.race-card .rc-dist{font-size:11px;opacity:.4;}
+.race-card .rc-time{font-size:22px;font-weight:bold;color:#38bdf8;font-family:'Fira Code',monospace;margin:6px 0;}
+.race-card .rc-pace{font-size:12px;opacity:.5;}
+
+/* 训练计划 */
+.week-plan{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px;}
+.wp-day{padding:10px 4px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:8px;text-align:center;font-size:10px;}
+.wp-day .wpd-label{opacity:.4;margin-bottom:4px;}
+.wp-day .wpd-type{font-weight:600;color:#38bdf8;font-size:11px;margin-bottom:2px;}
+.wp-day .wpd-desc{opacity:.4;font-size:9px;}
+.wp-day.rest{opacity:.4;}
+
+.plan-detail{margin-top:12px;}
+.pd-item{padding:12px;background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.05);border-radius:8px;margin-bottom:6px;display:flex;gap:12px;align-items:center;}
+.pd-item .pdi-icon{font-size:20px;width:36px;height:36px;display:flex;align-items:center;justify-content:center;background:rgba(56,189,248,.1);border-radius:8px;}
+.pd-item .pdi-info{flex:1;}
+.pd-item .pdi-name{font-size:13px;font-weight:600;}
+.pd-item .pdi-desc{font-size:11px;opacity:.5;margin-top:2px;}
+.pd-item .pdi-dist{font-family:'Fira Code',monospace;font-size:12px;color:#38bdf8;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header"><h1>🏃 PaceCalc</h1></div>
+  <div class="tabs">
+    <div class="tab active" onclick="showView('calculator')">🧮 配速计算</div>
+    <div class="tab" onclick="showView('zones')">💓 训练区间</div>
+    <div class="tab" onclick="showView('predict')">🏆 比赛预测</div>
+    <div class="tab" onclick="showView('plan')">📋 训练计划</div>
+    <div class="tab" onclick="showView('splits')">📊 分段表</div>
+  </div>
+
+  <!-- 配速计算器 -->
+  <div class="view active" id="vCalculator">
+    <div class="card">
+      <h3>🧮 配速 / 速度 / 时间 互算</h3>
+      <div class="inp-grid">
+        <div class="inp-group"><label>距离</label><input id="cDist" type="number" placeholder="5" value="5"></div>
+        <div class="inp-group"><label>单位</label><select id="cUnit"><option value="km">公里 (km)</option><option value="mi">英里 (mi)</option><option value="m">米 (m)</option></select></div>
+        <div class="inp-group"><label>时间 (时:分:秒)</label><input id="cTime" placeholder="0:25:00" value="0:25:00"></div>
+      </div>
+      <button class="calc-btn" onclick="calcPace()">⚡ 计算</button>
+    </div>
+    <div class="result-banner" id="paceResult" style="display:none;"></div>
+    <div class="result-grid" id="paceDetails"></div>
+  </div>
+
+  <!-- 训练区间 -->
+  <div class="view" id="vZones">
+    <div class="card">
+      <h3>💓 基于最近成绩计算训练区间</h3>
+      <div class="inp-grid">
+        <div class="inp-group"><label>最近比赛距离 (km)</label><input id="zDist" type="number" value="5"></div>
+        <div class="inp-group"><label>完赛时间 (分:秒)</label><input id="zTime" placeholder="25:00" value="25:00"></div>
+        <div class="inp-group"><label>最大心率 (可选)</label><input id="zHR" type="number" placeholder="190"></div>
+      </div>
+      <button class="calc-btn" onclick="calcZones()">💓 生成训练区间</button>
+    </div>
+    <div id="zonesOutput"></div>
+  </div>
+
+  <!-- 比赛预测 -->
+  <div class="view" id="vPredict">
+    <div class="card">
+      <h3>🏆 基于当前能力预测比赛成绩</h3>
+      <p style="font-size:11px;opacity:.4;margin-bottom:10px;">输入任一距离的真实成绩，使用 Riegel 公式预测其他距离完赛时间</p>
+      <div class="inp-grid">
+        <div class="inp-group"><label>已知距离 (km)</label><input id="pDist" type="number" value="5"></div>
+        <div class="inp-group"><label>完赛时间 (分:秒)</label><input id="pTime" placeholder="25:00" value="25:00"></div>
+      </div>
+      <button class="calc-btn" onclick="predictRaces()">🏆 预测成绩</button>
+    </div>
+    <div class="race-grid" id="raceGrid"></div>
+  </div>
+
+  <!-- 训练计划 -->
+  <div class="view" id="vPlan">
+    <div class="card">
+      <h3>📋 生成周训练计划</h3>
+      <div class="inp-grid">
+        <div class="inp-group"><label>目标赛事</label><select id="plGoal"><option value="5k">5K</option><option value="10k" selected>10K</option><option value="half">半马</option><option value="full">全马</option></select></div>
+        <div class="inp-group"><label>当前周跑量 (km)</label><input id="plVol" type="number" value="30"></div>
+        <div class="inp-group"><label>训练阶段</label><select id="plPhase"><option value="base">基础期</option><option value="build" selected>提升期</option><option value="peak">巅峰期</option><option value="taper">减量期</option></select></div>
+        <div class="inp-group"><label>每周跑步天数</label><select id="plDays"><option value="3">3天</option><option value="4" selected>4天</option><option value="5">5天</option><option value="6">6天</option></select></div>
+      </div>
+      <button class="calc-btn" onclick="genPlan()">📋 生成计划</button>
+    </div>
+    <div id="planOutput"></div>
+  </div>
+
+  <!-- 分段表 -->
+  <div class="view" id="vSplits">
+    <div class="card">
+      <h3>📊 生成比赛分段配速表</h3>
+      <div class="inp-grid">
+        <div class="inp-group"><label>比赛距离 (km)</label><input id="sDist" type="number" value="10"></div>
+        <div class="inp-group"><label>目标时间 (分:秒)</label><input id="sTime" placeholder="50:00" value="50:00"></div>
+        <div class="inp-group"><label>策略</label><select id="sStrat"><option value="even">匀速</option><option value="negative">负分段(先慢后快)</option><option value="positive">正分段(先快后慢)</option></select></div>
+      </div>
+      <button class="calc-btn" onclick="genSplits()">📊 生成分段表</button>
+    </div>
+    <div id="splitsOutput"></div>
+  </div>
+</div>
+
+<script>
+// ====== 工具函数 ======
+function timeToSec(t){
+    const parts=t.split(':').map(Number);
+    if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+    if(parts.length===2) return parts[0]*60+parts[1];
+    return parts[0];
+}
+function secToTime(s){
+    s=Math.round(s);
+    const h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+    if(h>0) return `${h}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+    return `${m}:${String(sec).padStart(2,'0')}`;
+}
+function paceStr(secPerKm){
+    const m=Math.floor(secPerKm/60), s=Math.round(secPerKm%60);
+    return `${m}'${String(s).padStart(2,'0')}"`;
+}
+
+function showView(name){
+    const views=['calculator','zones','predict','plan','splits'];
+    document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',views[i]===name));
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    document.getElementById('v'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+}
+
+// ====== 配速计算 ======
+function calcPace(){
+    let dist = parseFloat(document.getElementById('cDist').value);
+    const unit = document.getElementById('cUnit').value;
+    const timeSec = timeToSec(document.getElementById('cTime').value);
+    if(!dist||!timeSec){alert('请输入距离和时间');return;}
+    // 统一为 km
+    let distKm = dist;
+    if(unit==='mi') distKm=dist*1.60934;
+    else if(unit==='m') distKm=dist/1000;
+
+    const paceSecKm = timeSec/distKm;
+    const paceSecMi = paceSecKm * 1.60934;
+    const speedKmh = distKm/(timeSec/3600);
+    const speedMph = speedKmh/1.60934;
+    const cal = Math.round(distKm * 65); // ~65 kcal/km 粗估
+
+    document.getElementById('paceResult').style.display='block';
+    document.getElementById('paceResult').innerHTML=`
+        <div class="rb-val">${paceStr(paceSecKm)} /km</div>
+        <div class="rb-label">配速 (每公里用时)</div>`;
+    document.getElementById('paceDetails').innerHTML=`
+        <div class="rg-item"><div class="rv">${paceStr(paceSecMi)}</div><div class="rl">配速 /英里</div></div>
+        <div class="rg-item"><div class="rv">${speedKmh.toFixed(2)}</div><div class="rl">速度 km/h</div></div>
+        <div class="rg-item"><div class="rv">${speedMph.toFixed(2)}</div><div class="rl">速度 mph</div></div>
+        <div class="rg-item"><div class="rv">${secToTime(timeSec)}</div><div class="rl">总用时</div></div>
+        <div class="rg-item"><div class="rv">${distKm.toFixed(2)} km</div><div class="rl">距离</div></div>
+        <div class="rg-item"><div class="rv">~${cal} kcal</div><div class="rl">消耗热量</div></div>`;
+}
+
+// ====== 训练区间 ======
+function calcZones(){
+    const dist=parseFloat(document.getElementById('zDist').value);
+    const timeSec=timeToSec(document.getElementById('zTime').value);
+    const maxHR=parseInt(document.getElementById('zHR').value)||190;
+    if(!dist||!timeSec){alert('请输入距离和时间');return;}
+    const vdot=calcVDOT(dist, timeSec);
+    const paceKm=timeSec/dist; // 当前比赛配速
+
+    const zones=[
+        {name:'Z1 恢复跑',pctMin:1.35,pctMax:1.55,hrMin:0.60,hrMax:0.70,color:'#3b82f6',desc:'轻松恢复，可自如对话'},
+        {name:'Z2 有氧跑',pctMin:1.15,pctMax:1.35,hrMin:0.70,hrMax:0.80,color:'#22c55e',desc:'基础耐力构建，可说短句'},
+        {name:'Z3 乳酸阈',pctMin:1.02,pctMax:1.10,hrMin:0.80,hrMax:0.88,color:'#fbbf24',desc:'舒适的艰苦，仅能说几个词'},
+        {name:'Z4 间歇配速',pctMin:0.92,pctMax:1.00,hrMin:0.88,hrMax:0.95,color:'#f97316',desc:'接近比赛强度，难以说话'},
+        {name:'Z5 冲刺',pctMin:0.80,pctMax:0.90,hrMin:0.95,hrMax:1.00,color:'#ef4444',desc:'最大努力，无法维持超过3分钟'}
+    ];
+
+    let html=`<div class="card"><h3>📊 训练配速区间 (VDOT ≈ ${vdot.toFixed(1)})</h3>`;
+    html+=`<div class="zone-bar">${zones.map(z=>`<div style="flex:1;background:${z.color};"></div>`).join('')}</div>`;
+    html+=`<div class="zone-list">`;
+    zones.forEach(z=>{
+        const minP=paceKm*z.pctMin, maxP=paceKm*z.pctMax;
+        const hrLow=Math.round(maxHR*z.hrMin), hrHigh=Math.round(maxHR*z.hrMax);
+        html+=`<div class="zone-item">
+            <div class="zone-dot" style="background:${z.color}"></div>
+            <span class="zone-name">${z.name}</span>
+            <span class="zone-pace">${paceStr(maxP)} - ${paceStr(minP)}</span>
+            <span class="zone-hr">❤ ${hrLow}-${hrHigh} bpm</span>
+            <span style="opacity:.3;font-size:10px;">${z.desc}</span>
+        </div>`;
+    });
+    html+=`</div></div>`;
+    document.getElementById('zonesOutput').innerHTML=html;
+}
+
+function calcVDOT(distKm, timeSec){
+    // 简化 VDOT 估算
+    const timeMin=timeSec/60;
+    const velocity=distKm*1000/timeMin; // m/min
+    const percentVO2=0.8+0.1894393*Math.exp(-0.012778*timeMin)+0.2989558*Math.exp(-0.1932605*timeMin);
+    const vo2=-4.6+0.182258*velocity+0.000104*velocity*velocity;
+    return vo2/percentVO2;
+}
+
+// ====== 比赛预测 ======
+function predictRaces(){
+    const dist=parseFloat(document.getElementById('pDist').value);
+    const timeSec=timeToSec(document.getElementById('pTime').value);
+    if(!dist||!timeSec){alert('请输入');return;}
+    // Riegel 公式: T2 = T1 * (D2/D1)^1.06
+    const races=[
+        {name:'1公里',dist:1,icon:'⚡'},
+        {name:'3公里',dist:3,icon:'🏃'},
+        {name:'5公里',dist:5,icon:'🏃‍♂️'},
+        {name:'10公里',dist:10,icon:'🏅'},
+        {name:'半程马拉松',dist:21.0975,icon:'🏆'},
+        {name:'全程马拉松',dist:42.195,icon:'👑'}
+    ];
+    document.getElementById('raceGrid').innerHTML=races.map(r=>{
+        const predicted=timeSec*Math.pow(r.dist/dist, 1.06);
+        const pace=predicted/r.dist;
+        return `<div class="race-card">
+            <div class="rc-dist">${r.icon} ${r.name}</div>
+            <div class="rc-time">${secToTime(predicted)}</div>
+            <div class="rc-pace">配速 ${paceStr(pace)} /km</div>
+        </div>`;
+    }).join('');
+}
+
+// ====== 训练计划 ======
+function genPlan(){
+    const goal=document.getElementById('plGoal').value;
+    const weeklyVol=parseFloat(document.getElementById('plVol').value);
+    const phase=document.getElementById('plPhase').value;
+    const days=parseInt(document.getElementById('plDays').value);
+
+    const goalDist={5:5,10:10,half:21.1,full:42.2}[goal.replace('k','')];
+    const volFactor={base:0.9,build:1.0,peak:1.1,taper:0.65}[phase];
+    const targetVol=Math.round(weeklyVol*volFactor);
+
+    // 训练类型池
+    const workoutTypes=[
+        {type:'easy',icon:'🟢',name:'轻松跑',desc:'Z2配速有氧跑',pct:0.2},
+        {type:'long',icon:'🔵',name:'长距离',desc:'长时间低强度耐力训练',pct:0.35},
+        {type:'tempo',icon:'🟡',name:'节奏跑',desc:'Z3乳酸阈配速持续跑',pct:0.15},
+        {type:'interval',icon:'🔴',name:'间歇跑',desc:'Z4高强度间歇重复',pct:0.18},
+        {type:'recovery',icon:'⚪',name:'恢复跑',desc:'极轻松Z1恢复',pct:0.12},
+        {type:'hill',icon:'🟠',name:'坡度训练',desc:'上坡重复提升力量',pct:0.15},
+        {type:'fartlek',icon:'🟣',name:'法特莱克',desc:'自由变速跑，混合强度',pct:0.15}
+    ];
+
+    // 按阶段分配
+    const planDays = [];
+    const weekLabels=['周一','周二','周三','周四','周五','周六','周日'];
+    let assignedDist=0;
+
+    // 确定训练日
+    const daySlots=[];
+    if(days===3) daySlots.push(1,3,6); // 二四日
+    else if(days===4) daySlots.push(1,2,4,6);
+    else if(days===5) daySlots.push(0,1,3,4,6);
+    else daySlots.push(0,1,2,3,4,6);
+
+    const longRunDist = Math.round(targetVol*0.3);
+    const remaining = targetVol-longRunDist;
+
+    for(let i=0;i<7;i++){
+        if(!daySlots.includes(i)){
+            planDays.push({day:weekLabels[i],type:'rest',icon:'😴',name:'休息',desc:'完全休息或轻度活动',dist:'-'});
+        } else if(i===daySlots[daySlots.length-1]){
+            planDays.push({day:weekLabels[i],type:'long',icon:'🔵',name:'长距离',desc:`Z2配速 ${longRunDist}km`,dist:longRunDist+'km'});
+        } else {
+            const idx=daySlots.indexOf(i);
+            let w;
+            if(phase==='base') w=workoutTypes[idx%2===0?0:4]; // easy/recovery
+            else if(phase==='build') w=workoutTypes[[0,2,3,5][idx%4]]; // easy/tempo/interval/hill
+            else if(phase==='peak') w=workoutTypes[[3,2,0,6][idx%4]]; // interval/tempo/easy/fartlek
+            else w=workoutTypes[[0,4,0,0][idx%4]]; // taper: easy/recovery
+            const d=Math.round(remaining/(daySlots.length-1));
+            planDays.push({day:weekLabels[i],...w,dist:d+'km'});
+        }
+    }
+
+    let html=`<div class="card"><h3>📅 本周训练计划 (目标周跑量: ${targetVol}km · ${phase==='base'?'基础期':phase==='build'?'提升期':phase==='peak'?'巅峰期':'减量期'})</h3>`;
+    html+=`<div class="week-plan">${planDays.map(d=>`<div class="wp-day ${d.type==='rest'?'rest':''}"><div class="wpd-label">${d.day}</div><div class="wpd-type">${d.icon}</div><div class="wpd-desc">${d.dist}</div></div>`).join('')}</div>`;
+    html+=`<div class="plan-detail">${planDays.filter(d=>d.type!=='rest').map(d=>`
+        <div class="pd-item"><div class="pdi-icon">${d.icon}</div><div class="pdi-info"><div class="pdi-name">${d.day} - ${d.name}</div><div class="pdi-desc">${d.desc}</div></div><div class="pdi-dist">${d.dist}</div></div>`).join('')}</div>`;
+    html+=`</div>`;
+    document.getElementById('planOutput').innerHTML=html;
+}
+
+// ====== 分段表 ======
+function genSplits(){
+    const dist=parseFloat(document.getElementById('sDist').value);
+    const timeSec=timeToSec(document.getElementById('sTime').value);
+    const strat=document.getElementById('sStrat').value;
+    if(!dist||!timeSec) return;
+
+    const avgPace=timeSec/dist;
+    const splits=[];
+    const numSplits=Math.ceil(dist);
+
+    for(let i=0;i<numSplits;i++){
+        const splitDist = (i===numSplits-1&&dist%1!==0) ? dist%1 : 1;
+        let paceAdj=0;
+        if(strat==='negative'){
+            paceAdj= (numSplits/2-i)*2; // 后段越来越快
+        } else if(strat==='positive'){
+            paceAdj= (i-numSplits/2)*2; // 前段快后段慢
+        }
+        const splitPace=avgPace+paceAdj;
+        const splitTime=splitPace*splitDist;
+        splits.push({km:i+1,dist:splitDist,pace:splitPace,time:splitTime});
+    }
+
+    // 累计时间
+    let cumTime=0;
+    splits.forEach(s=>{cumTime+=s.time;s.cumTime=cumTime;});
+
+    let html=`<div class="card"><h3>📊 ${dist}km 分段配速表 (目标: ${secToTime(timeSec)})</h3>`;
+    html+=`<table class="split-table"><thead><tr><th>公里</th><th>分段配速</th><th>分段用时</th><th>累计时间</th><th>剩余</th></tr></thead><tbody>`;
+    splits.forEach(s=>{
+        html+=`<tr><td>${s.km} km</td><td>${paceStr(s.pace)}</td><td>${secToTime(s.time)}</td><td>${secToTime(s.cumTime)}</td><td>${secToTime(timeSec-s.cumTime)}</td></tr>`;
+    });
+    html+=`</tbody></table></div>`;
+    document.getElementById('splitsOutput').innerHTML=html;
+}
+
+// ====== 初始化 ======
+calcPace();
+</script>
+</body>
+</html>
